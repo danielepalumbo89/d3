@@ -17,7 +17,7 @@ h2 {
 }
 
 .state text {
-  font: 12px sans-serif;
+  font: 14px sans-serif;
   text-anchor: middle;
 }
 
@@ -38,13 +38,13 @@ h2 {
 }
 
 span.state--banned {
-  font-size: 16px;
+  font-size: 25px;
   color: #2b8cbe;
   font-weight: bold;
 }
 
 span.state--reg  {
-  font-size: 16px;
+  font-size: 25px;
   color: #de2d26;
   font-weight: bold;
 }
@@ -94,6 +94,56 @@ a {
 
   color: #333;
 }
+.bar {
+  fill: #1c9099;
+}
+
+.bar:hover {
+  fill: #8adb2b;
+}
+
+.axis {
+  font-size: 10px;
+  font-family: 'Open Sans', sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: line;
+}
+
+.grid .tick {
+    stroke: lightgrey;
+    opacity: 0.7;
+}
+.grid path {
+      stroke-width: 0;
+}
+
+.d3-tip:after {
+  box-sizing: border-box;
+  display: inline;
+  font-size: 10px;
+  width: 100%;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.8);
+  content: "\25BC";
+  position: absolute;
+  text-align: center;
+}
+
+/* Style northward tooltips differently */
+.d3-tip.n:after {
+  margin: -1px 0 0 0;
+  top: 100%;
+  left: 0;
+}
 </style>
 <h2>US presidential election 2016 - forecast</h2>
 <div class="explainer"><span class="state--banned">27 states</span> forecasted to have more than 50% of votes for Hillary Clinton</div>
@@ -114,6 +164,7 @@ a {
 </script>
 <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
+<script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
 <script>
 
 var states = [],
@@ -289,7 +340,134 @@ bars
 
     </script>
 
-<div x="80" y="-40" class="explainer"><span class="percentage--hil">68.4%</span> Hillary Clinton <span style="margin-left: 17em;">Donald Trump <span class="percentage--tru">31.6%</span></div> 
+    <div x="80" y="-40" class="explainer"><span class="percentage--hil">68.4%</span> Hillary Clinton <span style="margin-left: 18em;">Donald Trump <span class="percentage--tru">31.6%</span></div> 
 
+
+  <div>
+  <h1>Number of votes by states</h1>  
+  <label><input x="10" y="-140" type="checkbox"> Sort values</label>
+  </div>
+
+  <script>
+
+// bar chart
+   
+var margin = {top: 20, right: 40, bottom: 40, left: 40},
+    width = 606 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var x = d3.scale.ordinal()
+    .rangeRoundBands([0, width], .1, .9);
+
+var y = d3.scale.linear()
+    .range([height, 0]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left");
+
+var tip = d3.tip()
+  .attr('class', 'd3-tip')
+  .offset([-10, 0])
+  .html(function(d) {
+    return "<strong> <span style='color: #252525; background-color: #ffffff; padding-left: 3px; padding-right: 3px; padding-bottom: 3px; padding-top: 3px'>" + "Votes: " + d.frequency + "</strong> </span>";
+
+  })
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+svg.call(tip);
+
+d3.csv("dataibt.csv", function(error, data) {
+
+  data.forEach(function(d) {
+    d.frequency = +d.frequency;
+  });
+
+  x.domain(data.map(function(d) { return d.letter; }));
+  y.domain([0, 60]);
+
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+      .selectAll("text")  
+            .style("text-anchor", "start")
+            .attr("y", 0)
+            .attr("x", 10)
+            .attr("dy", ".35em")
+            .attr("transform", function(d) {return "rotate(-270)" });
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Electoral votes");
+
+  svg.selectAll(".bar")
+      .data(data)
+    .enter().append("rect")
+      .attr("class", "bar")
+      .attr("x", function(d) { return x(d.letter); })
+      .attr("width", x.rangeBand())
+      .attr("y", function(d) { return y(d.frequency); })
+      .attr("height", function(d) { return height - y(d.frequency); });
+
+      svg.selectAll(".bar")      
+      .on('mouseover', tip.show)
+      .on('mouseout', tip.hide);
+
+  d3.select("input").on("change", change);
+
+  var sortTimeout = setTimeout(function() {
+    d3.select("input").property("checked", true).each(change);
+  }, 5000);
+
+  function change() {
+    clearTimeout(sortTimeout);
+
+    // Copy-on-write since tweens are evaluated after a delay.
+    var x0 = x.domain(data.sort(this.checked
+        ? function(a, b) { return b.frequency - a.frequency; }
+        : function(a, b) { return d3.ascending(a.letter, b.letter); })
+        .map(function(d) { return d.letter; }))
+        .copy();
+
+    svg.selectAll(".bar")
+        .sort(function(a, b) { return x0(a.letter) - x0(b.letter); });
+
+    var transition = svg.transition().duration(1500),
+        delay = function(d, i) { return i * 50; };
+
+    transition.selectAll(".bar")
+        .delay(delay)
+        .attr("x", function(d) { return x0(d.letter); });
+
+    transition.select(".x.axis")
+        .call(xAxis)
+      .selectAll("g")
+        .delay(delay)
+      .selectAll("text")
+          .attr("y", 0)
+          .attr("x", 10)
+          .attr("dy", ".35em")
+          .attr("transform", "rotate(90)")
+          .style("text-anchor", "start");
+  }
+});
+
+</script>
 
  <script src="src/pym.js" type="text/javascript"></script>
